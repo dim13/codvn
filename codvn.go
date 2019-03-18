@@ -10,7 +10,7 @@
 //   {x-isSHA512, 15000} encoding=RFC2307, algorithm=iSSHA-512, iterations=15000, saltsize=128
 //
 // References:
-//  - RFC2307
+//  - https://tools.ietf.org/html/rfc2307 (Section 5.3)
 //  - https://www.onapsis.com/blog/understanding-sap-codvn-h-algorithm
 //  - https://hashcat.net/wiki/doku.php?id=example_hashes
 //  - https://hashcat.net/forum/thread-3804.html
