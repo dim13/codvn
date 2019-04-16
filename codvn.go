@@ -26,8 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"regexp"
-	"strconv"
+	"unicode"
 )
 
 // Errors
@@ -37,57 +36,81 @@ var (
 	ErrDontMatch      = errors.New("password doesn't match")
 )
 
+type Kind string
+
+func (k *Kind) Scan(state fmt.ScanState, verb rune) error {
+	token, err := state.Token(true, func(c rune) bool {
+		return !unicode.IsSpace(c) && !unicode.IsPunct(c)
+	})
+	*k = Kind(token)
+	return err
+}
+
+const (
+	SHA1   Kind = "sha"
+	SHA256 Kind = "SHA256"
+	SHA384 Kind = "SHA384"
+	SHA512 Kind = "SHA512"
+)
+
 // CodvN password
 type CodvN struct {
-	h    hash.Hash
-	kind string
-	iter int
-	hash []byte
-	salt []byte
+	Kind Kind
+	Iter int
+	Hash []byte
+	Salt []byte
+}
+
+func (k Kind) newHash() (hash.Hash, error) {
+	switch k {
+	case SHA1:
+		return sha1.New(), nil
+	case SHA256:
+		return sha256.New(), nil
+	case SHA384:
+		return sha512.New384(), nil
+	case SHA512:
+		return sha512.New(), nil
+	}
+	return nil, ErrUnknownHash
+}
+
+func (c *CodvN) UnmarshalText(text []byte) error {
+	var hash string
+	_, err := fmt.Sscanf(string(text), "{x-is%s,%d}%s", &c.Kind, &c.Iter, &hash)
+	if err != nil {
+		return err
+	}
+	h, err := c.Kind.newHash()
+	if err != nil {
+		return err
+	}
+	parts, err := base64.StdEncoding.DecodeString(hash)
+	if err != nil {
+		return err
+	}
+	size := h.Size()
+	if len(parts) < size {
+		return ErrTruncatedInput
+	}
+	c.Salt, c.Hash = parts[size:], parts[:size]
+	return nil
 }
 
 func (c CodvN) String() string {
-	hashed := base64.StdEncoding.EncodeToString(append(c.hash, c.salt...))
-	return fmt.Sprintf("{x-is%s, %d}%s", c.kind, c.iter, hashed)
+	hashed := base64.StdEncoding.EncodeToString(append(c.Hash, c.Salt...))
+	return fmt.Sprintf("{x-is%s,%d}%s", c.Kind, c.Iter, hashed)
+}
+
+func (c *CodvN) MarshalText() (text []byte, err error) {
+	return []byte(c.String()), nil
 }
 
 // Parse password
-func Parse(raw []byte) (CodvN, error) {
+func Parse(text []byte) (CodvN, error) {
 	var c CodvN
-	re := regexp.MustCompile(`^{x-is([[:alnum:]]+), *([[:digit:]]+)}(.*)$`)
-	match := re.FindStringSubmatch(string(raw))
-	if len(match) != 4 {
-		return c, ErrUnknownHash
-	}
-	switch match[1] {
-	case "sha":
-		c.h = sha1.New()
-	case "SHA256":
-		c.h = sha256.New()
-	case "SHA384":
-		c.h = sha512.New384()
-	case "SHA512":
-		c.h = sha512.New()
-	default:
-		return c, ErrUnknownHash
-	}
-	c.kind = match[1]
-	iter, err := strconv.Atoi(match[2])
-	if err != nil {
-		return c, err
-	}
-	c.iter = iter
-	parts, err := base64.StdEncoding.DecodeString(match[3])
-	if err != nil {
-		return c, err
-	}
-	size := c.h.Size()
-	if len(parts) < size {
-		return c, ErrTruncatedInput
-	}
-	c.hash = parts[:size]
-	c.salt = parts[size:]
-	return c, nil
+	err := c.UnmarshalText(text)
+	return c, err
 }
 
 // Encode password
@@ -103,11 +126,15 @@ func Encode(h hash.Hash, pass, salt []byte, iter int) ([]byte, error) {
 
 // Verify hashed password
 func (c CodvN) Verify(clear []byte) error {
-	hash, err := Encode(c.h, clear, c.salt, c.iter)
+	h, err := c.Kind.newHash()
 	if err != nil {
 		return err
 	}
-	if subtle.ConstantTimeCompare(hash, c.hash) != 1 {
+	hash, err := Encode(h, clear, c.Salt, c.Iter)
+	if err != nil {
+		return err
+	}
+	if subtle.ConstantTimeCompare(hash, c.Hash) != 1 {
 		return ErrDontMatch
 	}
 	return nil
@@ -115,8 +142,8 @@ func (c CodvN) Verify(clear []byte) error {
 
 // Verify hashed password
 func Verify(hashed, clear []byte) error {
-	c, err := Parse(hashed)
-	if err != nil {
+	var c CodvN
+	if err := c.UnmarshalText(hashed); err != nil {
 		return err
 	}
 	return c.Verify(clear)

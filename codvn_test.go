@@ -7,19 +7,19 @@ func TestVerify(t *testing.T) {
 		hashed, clear string
 	}{
 		{
-			hashed: `{x-issha, 1024}IlU5JC/UaAzvUl8ncaxIBlFQ1Nfd0C5YxkizRFg970g=`,
+			hashed: `{x-issha,1024}IlU5JC/UaAzvUl8ncaxIBlFQ1Nfd0C5YxkizRFg970g=`,
 			clear:  `Pindakaas!`,
 		},
 		{
-			hashed: `{x-isSHA256, 10000}MMuaPcoQH1RbzPUdV3/kjNsG27X6UYILSCW8yDSD70skvasBGNvXXhFPKJcWKmDS`,
+			hashed: `{x-isSHA256,10000}MMuaPcoQH1RbzPUdV3/kjNsG27X6UYILSCW8yDSD70skvasBGNvXXhFPKJcWKmDS`,
 			clear:  `HashCat!`,
 		},
 		{
-			hashed: `{x-isSHA384, 7500}kqOPN/VxvZXpD8zEiRBAe1L6fW6GTXRd/RFl0AbaEbyCZFeMBA8+NKV6MG2Me2u3ZRlCdflPuccjtr55`,
+			hashed: `{x-isSHA384,7500}kqOPN/VxvZXpD8zEiRBAe1L6fW6GTXRd/RFl0AbaEbyCZFeMBA8+NKV6MG2Me2u3ZRlCdflPuccjtr55`,
 			clear:  `HashCat!`,
 		},
 		{
-			hashed: `{x-isSHA512, 15000}lbaY7cwziH2rPfBdr9T3mZKT/DMXstwSzT1mXNipjYxqoIXfmKBIrcfSNkwq/S5DbqtrDCKX7iOnzPhnIyXRitydEZPrB/BseZ799wYL2O0=`,
+			hashed: `{x-isSHA512,15000}lbaY7cwziH2rPfBdr9T3mZKT/DMXstwSzT1mXNipjYxqoIXfmKBIrcfSNkwq/S5DbqtrDCKX7iOnzPhnIyXRitydEZPrB/BseZ799wYL2O0=`,
 			clear:  `testtest`,
 		},
 	}
@@ -40,7 +40,7 @@ func TestVerify(t *testing.T) {
 }
 
 func BenchmarkSHA(b *testing.B) {
-	hashed := []byte(`{x-issha, 1024}IlU5JC/UaAzvUl8ncaxIBlFQ1Nfd0C5YxkizRFg970g=`)
+	hashed := []byte(`{x-issha,1024}IlU5JC/UaAzvUl8ncaxIBlFQ1Nfd0C5YxkizRFg970g=`)
 	clear := []byte(`Pindakaas!`)
 	for i := 0; i < b.N; i++ {
 		Verify(hashed, clear)
