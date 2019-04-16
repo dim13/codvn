@@ -117,6 +117,7 @@ func Parse(text []byte) (CodvN, error) {
 	return c, err
 }
 
+// New password
 func New(kind Kind, pass, salt []byte, iter int) (CodvN, error) {
 	h, err := newHash(kind)
 	if err != nil {

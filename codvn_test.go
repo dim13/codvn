@@ -29,7 +29,7 @@ var testCases = []struct {
 	},
 }
 
-func TestVerify(t *testing.T) {
+func TestCodvN(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.title, func(t *testing.T) {
 			c, err := Parse([]byte(tc.hashed))
@@ -46,7 +46,7 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-func BenchmarkSHA(b *testing.B) {
+func BenchmarkCodvN(b *testing.B) {
 	for _, tc := range testCases {
 		b.Run(tc.title, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
