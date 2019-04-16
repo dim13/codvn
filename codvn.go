@@ -36,8 +36,10 @@ var (
 	ErrDontMatch      = errors.New("password doesn't match")
 )
 
+// Kind of password
 type Kind string
 
+// Scan implements fmt.Scanner
 func (k *Kind) Scan(state fmt.ScanState, verb rune) error {
 	token, err := state.Token(true, func(c rune) bool {
 		return !unicode.IsSpace(c) && !unicode.IsPunct(c)
@@ -61,8 +63,8 @@ type CodvN struct {
 	Salt []byte
 }
 
-func (k Kind) newHash() (hash.Hash, error) {
-	switch k {
+func newHash(kind Kind) (hash.Hash, error) {
+	switch kind {
 	case SHA1:
 		return sha1.New(), nil
 	case SHA256:
@@ -75,13 +77,14 @@ func (k Kind) newHash() (hash.Hash, error) {
 	return nil, ErrUnknownHash
 }
 
+// UnmarshalText parses password
 func (c *CodvN) UnmarshalText(text []byte) error {
 	var hash string
 	_, err := fmt.Sscanf(string(text), "{x-is%s,%d}%s", &c.Kind, &c.Iter, &hash)
 	if err != nil {
 		return err
 	}
-	h, err := c.Kind.newHash()
+	h, err := newHash(c.Kind)
 	if err != nil {
 		return err
 	}
@@ -102,6 +105,7 @@ func (c CodvN) String() string {
 	return fmt.Sprintf("{x-is%s,%d}%s", c.Kind, c.Iter, hashed)
 }
 
+// MarshalText encodes password
 func (c *CodvN) MarshalText() (text []byte, err error) {
 	return []byte(c.String()), nil
 }
@@ -113,8 +117,20 @@ func Parse(text []byte) (CodvN, error) {
 	return c, err
 }
 
-// Encode password
-func Encode(h hash.Hash, pass, salt []byte, iter int) ([]byte, error) {
+func New(kind Kind, pass, salt []byte, iter int) (CodvN, error) {
+	h, err := newHash(kind)
+	if err != nil {
+		return CodvN{}, err
+	}
+	hash, err := encode(h, pass, salt, iter)
+	if err != nil {
+		return CodvN{}, err
+	}
+	return CodvN{Kind: kind, Iter: iter, Hash: hash, Salt: salt}, nil
+}
+
+// encode password
+func encode(h hash.Hash, pass, salt []byte, iter int) ([]byte, error) {
 	for i := 0; i < iter; i++ {
 		h.Reset()
 		h.Write(pass)
@@ -126,15 +142,11 @@ func Encode(h hash.Hash, pass, salt []byte, iter int) ([]byte, error) {
 
 // Verify hashed password
 func (c CodvN) Verify(clear []byte) error {
-	h, err := c.Kind.newHash()
+	n, err := New(c.Kind, clear, c.Salt, c.Iter)
 	if err != nil {
 		return err
 	}
-	hash, err := Encode(h, clear, c.Salt, c.Iter)
-	if err != nil {
-		return err
-	}
-	if subtle.ConstantTimeCompare(hash, c.Hash) != 1 {
+	if subtle.ConstantTimeCompare(n.Hash, c.Hash) != 1 {
 		return ErrDontMatch
 	}
 	return nil
@@ -142,8 +154,8 @@ func (c CodvN) Verify(clear []byte) error {
 
 // Verify hashed password
 func Verify(hashed, clear []byte) error {
-	var c CodvN
-	if err := c.UnmarshalText(hashed); err != nil {
+	c, err := Parse(hashed)
+	if err != nil {
 		return err
 	}
 	return c.Verify(clear)
