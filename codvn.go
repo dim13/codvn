@@ -26,12 +26,14 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"io"
 	"unicode"
 )
 
 // Errors
 var (
 	ErrUnknownHash    = errors.New("unknown hash schema")
+	ErrZeroIterations = errors.New("zero iterations")
 	ErrTruncatedInput = errors.New("truncated input")
 	ErrDontMatch      = errors.New("password doesn't match")
 )
@@ -82,7 +84,13 @@ func (c *CodvN) UnmarshalText(text []byte) error {
 	var hash string
 	_, err := fmt.Sscanf(string(text), "{x-is%s,%d}%s", &c.Kind, &c.Iter, &hash)
 	if err != nil {
+		if err == io.ErrUnexpectedEOF {
+			return ErrTruncatedInput
+		}
 		return err
+	}
+	if c.Iter <= 0 {
+		return ErrZeroIterations
 	}
 	h, err := newHash(c.Kind)
 	if err != nil {
